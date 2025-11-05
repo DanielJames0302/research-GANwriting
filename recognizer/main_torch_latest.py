@@ -20,9 +20,14 @@ from models.attention import locationAttention as Attention
 #from models.attention import TroAttention as Attention
 from models.seq2seq import Seq2Seq
 from utils import visualizeAttn, writePredict, writeLoss, HEIGHT, WIDTH, output_max_len, vocab_size, FLIP, WORD_LEVEL, load_data_func, tokens, GT_TE
+import loadData4_vgg as loadData_module
 
 parser = argparse.ArgumentParser(description='seq2seq net', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('start_epoch', type=int, help='load saved weights from which epoch')
+parser.add_argument('--dataset', type=str, default='iam', choices=['iam', 'captcha'],
+                    help='Dataset to use: iam or captcha')
+parser.add_argument('--captcha_dir', type=str, default='test/correct_test',
+                    help='Directory containing captcha images (only used when --dataset=captcha)')
 args = parser.parse_args()
 
 #torch.cuda.set_device(1)
@@ -130,14 +135,22 @@ def teacher_force_func_2(epoch):
 
 
 def all_data_loader():
-    data_train, data_valid, data_test = load_data_func()
+    if args.dataset == 'captcha':
+        print(f"Loading captcha dataset from {args.captcha_dir}")
+        data_train, data_valid, data_test = loadData_module.loadCaptchaData(args.captcha_dir)
+    else:
+        print("Loading IAM dataset")
+        data_train, data_valid, data_test = load_data_func()
     train_loader = torch.utils.data.DataLoader(data_train, collate_fn=sort_batch, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_THREAD, pin_memory=True)
     valid_loader = torch.utils.data.DataLoader(data_valid, collate_fn=sort_batch, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_THREAD, pin_memory=True)
     test_loader = torch.utils.data.DataLoader(data_test, collate_fn=sort_batch, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_THREAD, pin_memory=True)
     return train_loader, valid_loader, test_loader
 
 def test_data_loader_batch(batch_size_nuevo):
-    _, _, data_test = load_data_func()
+    if args.dataset == 'captcha':
+        _, _, data_test = loadData_module.loadCaptchaData(args.captcha_dir)
+    else:
+        _, _, data_test = load_data_func()
     test_loader = torch.utils.data.DataLoader(data_test, collate_fn=sort_batch, batch_size=batch_size_nuevo, shuffle=False, num_workers=NUM_THREAD, pin_memory=True)
     return test_loader
 

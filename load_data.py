@@ -223,5 +223,150 @@ def create_pairs(ddict):
     label2wid = list(zip(range(num), ddict.keys()))
     print(label2wid)
 
+
+class CaptchaDataset(D.Dataset):
+    """Dataset class for captcha images from test/correct_test/ folder"""
+    def __init__(self, captcha_dir, oov):
+        self.captcha_dir = captcha_dir
+        self.oov = oov
+        self.output_max_len = OUTPUT_MAX_LEN
+        self.image_files = []
+        
+        # Load all PNG files from the captcha directory
+        if os.path.exists(captcha_dir):
+            for file in os.listdir(captcha_dir):
+                if file.endswith('.png'):
+                    self.image_files.append(file)
+        else:
+            raise ValueError(f"Captcha directory not found: {captcha_dir}")
+        
+        print(f"Loaded {len(self.image_files)} captcha images from {captcha_dir}")
+    
+    def __getitem__(self, index):
+        filename = self.image_files[index]
+        # Extract label from filename: remove '-0.png' suffix
+        # e.g., "002e23-0.png" -> "002e23"
+        label_str = filename.replace('-0.png', '').replace('.png', '')
+        
+        # Read image
+        img, img_width = self.read_image_single(os.path.join(self.captcha_dir, filename))
+        label = self.label_padding(label_str, num_tokens)
+        
+        # For captcha, we don't have writer IDs, so we use a dummy writer ID (0)
+        # The model expects writer IDs, so we'll use 0 for all captcha images
+        dummy_wid = 0
+        dummy_idx = filename.replace('.png', '')
+        
+        # Create a list structure similar to IAM_words format
+        # Since we need multiple images per batch, we'll repeat the same image
+        # The model expects EXTRA_CHANNEL images, so we'll create them
+        imgs = [img] * EXTRA_CHANNEL
+        idxs = [dummy_idx] * EXTRA_CHANNEL
+        img_widths = [img_width] * EXTRA_CHANNEL
+        labels = [label] * EXTRA_CHANNEL
+        
+        final_img = np.stack(imgs, axis=0)
+        final_idx = np.array(idxs)
+        final_img_width = np.array(img_widths)
+        final_label = np.array(labels)
+        
+        # Select one image for target (similar to IAM_words)
+        _id = np.random.randint(EXTRA_CHANNEL)
+        img_xt = final_img[_id:_id+1]
+        
+        if self.oov:
+            label_xt = np.random.choice(text_corpus)
+            label_xt = np.array(self.label_padding(label_xt, num_tokens))
+            label_xt_swap = np.random.choice(text_corpus)
+            label_xt_swap = np.array(self.label_padding(label_xt_swap, num_tokens))
+        else:
+            label_xt = final_label[_id]
+            label_xt_swap = self.new_ed1(label_xt)
+        
+        final_idx = np.delete(final_idx, _id, axis=0)
+        final_img = np.delete(final_img, _id, axis=0)
+        final_img_width = np.delete(final_img_width, _id, axis=0)
+        final_label = np.delete(final_label, _id, axis=0)
+        
+        return 'src', dummy_wid, final_idx, final_img, final_img_width, final_label, img_xt, label_xt, label_xt_swap
+    
+    def __len__(self):
+        return len(self.image_files)
+    
+    def read_image_single(self, file_path):
+        """Read and preprocess a single captcha image"""
+        img = cv2.imread(file_path, 0)  # Read as grayscale
+        
+        if img is None:
+            # Image is corrupted or doesn't exist
+            return np.zeros((IMG_HEIGHT, IMG_WIDTH)), 0
+        
+        # Resize maintaining aspect ratio
+        rate = float(IMG_HEIGHT) / img.shape[0]
+        img = cv2.resize(img, (int(img.shape[1]*rate)+1, IMG_HEIGHT), interpolation=cv2.INTER_CUBIC)
+        img = img/255.  # 0-255 -> 0-1
+        
+        # Invert image (same as IAM preprocessing)
+        img = 1. - img
+        img_width = img.shape[-1]
+        
+        # Pad or crop to IMG_WIDTH
+        if img_width > IMG_WIDTH:
+            outImg = img[:, :IMG_WIDTH]
+            img_width = IMG_WIDTH
+        else:
+            outImg = np.zeros((IMG_HEIGHT, IMG_WIDTH), dtype='float32')
+            outImg[:, :img_width] = img
+        outImg = outImg.astype('float32')
+        
+        # Normalize (same as IAM preprocessing)
+        mean = 0.5
+        std = 0.5
+        outImgFinal = (outImg - mean) / std
+        return outImgFinal, img_width
+    
+    def new_ed1(self, word_ori):
+        """Create a word with one edit (same as IAM_words)"""
+        word = word_ori.copy()
+        start = word.index(tokens['GO_TOKEN'])
+        fin = word.index(tokens['END_TOKEN'])
+        word = ''.join([index2letter[i-num_tokens] for i in word[start+1: fin]])
+        new_word = edits1(word)
+        label = np.array(self.label_padding(new_word, num_tokens))
+        return label
+    
+    def label_padding(self, labels, num_tokens):
+        """Pad labels to output_max_len (same as IAM_words)"""
+        new_label_len = []
+        ll = [letter2index[i] for i in labels]
+        new_label_len.append(len(ll)+2)
+        ll = np.array(ll) + num_tokens
+        ll = list(ll)
+        ll = [tokens['GO_TOKEN']] + ll + [tokens['END_TOKEN']]
+        num = self.output_max_len - len(ll)
+        if not num == 0:
+            ll.extend([tokens['PAD_TOKEN']] * num)  # replace PAD_TOKEN
+        return ll
+
+
+def loadCaptchaData(oov, captcha_dir='test/correct_test'):
+    """
+    Load captcha dataset from test/correct_test/ folder
+    
+    Args:
+        oov: Whether to use out-of-vocabulary words
+        captcha_dir: Directory containing captcha images
+    
+    Returns:
+        data_train: CaptchaDataset for training (same as test for captcha)
+        data_test: CaptchaDataset for testing
+    """
+    # For captcha, we use the same dataset for both train and test
+    # since we only have one folder of images
+    data_train = CaptchaDataset(captcha_dir, oov)
+    data_test = CaptchaDataset(captcha_dir, oov)
+    return data_train, data_test
+
+
 if __name__ == '__main__':
     pass

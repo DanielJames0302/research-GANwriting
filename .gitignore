@@ -2,3 +2,4 @@ imgs/
 save_weights/
 recognizer/models/__pycache__/
 __pycache__/
+test/

@@ -7,11 +7,15 @@ import time
 import argparse
 from load_data import NUM_WRITERS
 from network_tro import ConTranModel
-from load_data import loadData as load_data_func
+from load_data import loadData as load_data_func, loadCaptchaData
 from loss_tro import CER
 
 parser = argparse.ArgumentParser(description='seq2seq net', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('start_epoch', type=int, help='load saved weights from which epoch')
+parser.add_argument('--dataset', type=str, default='iam', choices=['iam', 'captcha'], 
+                    help='Dataset to use: iam or captcha')
+parser.add_argument('--captcha_dir', type=str, default='test/correct_test',
+                    help='Directory containing captcha images (only used when --dataset=captcha)')
 args = parser.parse_args()
 
 gpu = torch.device('cuda')
@@ -38,7 +42,12 @@ CurriculumModelID = args.start_epoch
 
 
 def all_data_loader():
-    data_train, data_test = load_data_func(OOV)
+    if args.dataset == 'captcha':
+        print(f"Loading captcha dataset from {args.captcha_dir}")
+        data_train, data_test = loadCaptchaData(OOV, args.captcha_dir)
+    else:
+        print("Loading IAM dataset")
+        data_train, data_test = load_data_func(OOV)
     train_loader = torch.utils.data.DataLoader(data_train, collate_fn=sort_batch, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_THREAD, pin_memory=True)
     test_loader = torch.utils.data.DataLoader(data_test, collate_fn=sort_batch, batch_size=BATCH_SIZE, shuffle=False, num_workers=NUM_THREAD, pin_memory=True)
     return train_loader, test_loader
