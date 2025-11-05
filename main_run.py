@@ -12,7 +12,7 @@ from loss_tro import CER
 
 parser = argparse.ArgumentParser(description='seq2seq net', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('start_epoch', type=int, help='load saved weights from which epoch')
-parser.add_argument('--dataset', type=str, default='iam', choices=['iam', 'captcha'], 
+parser.add_argument('--dataset', type=str, default='captcha', choices=['iam', 'captcha'], 
                     help='Dataset to use: iam or captcha')
 parser.add_argument('--captcha_dir', type=str, default='test/correct_test',
                     help='Directory containing captcha images (only used when --dataset=captcha)')
