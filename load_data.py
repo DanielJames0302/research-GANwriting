@@ -244,9 +244,12 @@ class CaptchaDataset(D.Dataset):
     
     def __getitem__(self, index):
         filename = self.image_files[index]
-        # Extract label from filename: remove '-0.png' suffix
-        # e.g., "002e23-0.png" -> "002e23"
-        label_str = filename.replace('-0.png', '').replace('.png', '')
+        # Extract label from filename: remove extension and take part before '-'
+        # e.g., "0c3dp-0.png" -> "0c3dp", "002e23-0.png" -> "002e23"
+        # Remove .png extension first
+        name_without_ext = filename.replace('.png', '')
+        # Split by '-' and take the first part (the actual label)
+        label_str = name_without_ext.split('-')[0]
         
         # Read image
         img, img_width = self.read_image_single(os.path.join(self.captcha_dir, filename))
