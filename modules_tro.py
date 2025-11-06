@@ -238,7 +238,20 @@ class TextEncoder_FC(nn.Module):
 
         batch_size = xx.shape[0]
         xxx = xx.reshape(batch_size, -1) # b,t*embed
-        out = self.fc(xxx)
+        
+        # Handle BatchNorm when batch size is 1 (BatchNorm requires batch_size > 1)
+        if batch_size == 1:
+            # Temporarily set BatchNorm layers to eval mode
+            for module in self.fc.modules():
+                if isinstance(module, nn.BatchNorm1d):
+                    module.eval()
+            out = self.fc(xxx)
+            # Set back to training mode
+            for module in self.fc.modules():
+                if isinstance(module, nn.BatchNorm1d):
+                    module.train()
+        else:
+            out = self.fc(xxx)
 
         '''embed content force'''
         xx_new = self.linear(xx) # b, text_max_len, 512
