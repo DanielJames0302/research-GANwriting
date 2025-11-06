@@ -29,7 +29,7 @@ src = 'Groundtruth/gan.iam.tr_va.gt.filter27'
 tar = 'Groundtruth/gan.iam.test.gt.filter27'
 
 def labelDictionary():
-    labels = list(string.ascii_lowercase + string.ascii_uppercase)
+    labels = list(string.ascii_lowercase + string.ascii_uppercase + string.digits)
     letter2index = {label: n for n, label in enumerate(labels)}
     index2letter = {v: k for k, v in letter2index.items()}
     return len(labels), letter2index, index2letter
