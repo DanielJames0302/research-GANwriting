@@ -17,7 +17,11 @@ GT_TE = loadData.GT_TE
 load_data_func = loadData.loadData
 
 def visualizeAttn(img, first_img_real_len, attn, epoch, count_n, name):
-    folder_name = 'imgs'
+    results_folder = os.environ.get('RESULTS_FOLDER', '')
+    if results_folder:
+        folder_name = f'{results_folder}/imgs'
+    else:
+        folder_name = 'imgs'
     if not os.path.exists(folder_name):
         os.makedirs(folder_name)
     img = img[:, :first_img_real_len]
@@ -39,7 +43,11 @@ def visualizeAttn(img, first_img_real_len, attn, epoch, count_n, name):
     cv2.imwrite(folder_name+'/'+name+'_'+str(epoch)+'.jpg', output)
 
 def writePredict(epoch, index, pred, flag): # [batch_size, vocab_size] * max_output_len
-    folder_name = 'pred_logs'
+    results_folder = os.environ.get('RESULTS_FOLDER', '')
+    if results_folder:
+        folder_name = f'{results_folder}/pred_logs'
+    else:
+        folder_name = 'pred_logs'
     if not os.path.exists(folder_name):
         os.makedirs(folder_name)
     file_prefix = folder_name+'/'+flag+'_predict_seq.'
@@ -77,7 +85,11 @@ def writePredict(epoch, index, pred, flag): # [batch_size, vocab_size] * max_out
     return batch_count_n
 
 def writeLoss(loss_value, flag):
-    folder_name = 'pred_logs'
+    results_folder = os.environ.get('RESULTS_FOLDER', '')
+    if results_folder:
+        folder_name = f'{results_folder}/pred_logs'
+    else:
+        folder_name = 'pred_logs'
     if not os.path.exists(folder_name):
         os.makedirs(folder_name)
     if flag == 'train':

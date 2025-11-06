@@ -5,6 +5,7 @@ from torch import optim
 import numpy as np
 import time
 import argparse
+from datetime import datetime
 from load_data import NUM_WRITERS
 from network_tro import ConTranModel
 from load_data import loadData as load_data_func, loadCaptchaData
@@ -185,7 +186,12 @@ def main(train_loader, test_loader, num_writers):
     model = ConTranModel(num_writers, show_iter_num, OOV).to(gpu)
 
     if CurriculumModelID > 0:
-        model_file = 'save_weights/contran-' + str(CurriculumModelID) +'.model'
+        # Try loading from timestamped folder first, fallback to old location
+        results_folder = os.environ.get('RESULTS_FOLDER', '')
+        if results_folder and os.path.exists(f'{results_folder}/save_weights/contran-{CurriculumModelID}.model'):
+            model_file = f'{results_folder}/save_weights/contran-{CurriculumModelID}.model'
+        else:
+            model_file = 'save_weights/contran-' + str(CurriculumModelID) +'.model'
         print('Loading ' + model_file)
         model.load_state_dict(torch.load(model_file)) #load
         #pretrain_dict = torch.load(model_file)
@@ -211,7 +217,11 @@ def main(train_loader, test_loader, num_writers):
         cer = train(train_loader, model, dis_opt, gen_opt, rec_opt, cla_opt, epoch)
 
         if epoch % MODEL_SAVE_EPOCH == 0:
-            folder_weights = 'save_weights'
+            results_folder = os.environ.get('RESULTS_FOLDER', '')
+            if results_folder:
+                folder_weights = f'{results_folder}/save_weights'
+            else:
+                folder_weights = 'save_weights'
             if not os.path.exists(folder_weights):
                 os.makedirs(folder_weights)
             torch.save(model.state_dict(), folder_weights+'/contran-%d.model'%epoch)
@@ -229,20 +239,37 @@ def main(train_loader, test_loader, num_writers):
                 min_count += 1
             if min_count >= EARLY_STOP_EPOCH:
                 print('Early stop at %d and the best epoch is %d' % (epoch, min_idx))
-                model_url = 'save_weights/contran-'+str(min_idx)+'.model'
+                results_folder = os.environ.get('RESULTS_FOLDER', '')
+                if results_folder:
+                    folder_weights = f'{results_folder}/save_weights'
+                else:
+                    folder_weights = 'save_weights'
+                model_url = f'{folder_weights}/contran-{min_idx}.model'
                 os.system('mv '+model_url+' '+model_url+'.bak')
-                os.system('rm save_weights/contran-*.model')
+                os.system(f'rm {folder_weights}/contran-*.model')
                 break
 
 def rm_old_model(index):
-    models = glob.glob('save_weights/*.model')
+    results_folder = os.environ.get('RESULTS_FOLDER', '')
+    if results_folder:
+        folder_weights = f'{results_folder}/save_weights'
+    else:
+        folder_weights = 'save_weights'
+    models = glob.glob(f'{folder_weights}/*.model')
     for m in models:
         epoch = int(m.split('.')[0].split('-')[1])
         if epoch < index:
-            os.system('rm save_weights/contran-'+str(epoch)+'.model')
+            os.system(f'rm {folder_weights}/contran-{epoch}.model')
 
 if __name__ == '__main__':
     print(time.ctime())
+    # Create results folder with timestamp
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    results_folder = f'results_{timestamp}'
+    os.makedirs(results_folder, exist_ok=True)
+    # Set environment variable so other modules can access it
+    os.environ['RESULTS_FOLDER'] = results_folder
+    print(f'Results will be saved in: {results_folder}')
     train_loader, test_loader = all_data_loader()
     main(train_loader, test_loader, NUM_WRITERS)
     print(time.ctime())
