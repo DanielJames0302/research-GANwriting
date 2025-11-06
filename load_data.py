@@ -243,30 +243,43 @@ class CaptchaDataset(D.Dataset):
         print(f"Loaded {len(self.image_files)} captcha images from {captcha_dir}")
     
     def __getitem__(self, index):
-        filename = self.image_files[index]
-        # Extract label from filename: remove extension and take part before '-'
-        # e.g., "0c3dp-0.png" -> "0c3dp", "002e23-0.png" -> "002e23"
-        # Remove .png extension first
-        name_without_ext = filename.replace('.png', '')
-        # Split by '-' and take the first part (the actual label)
-        label_str = name_without_ext.split('-')[0]
+        # Sample multiple different captcha images to learn from visual diversity
+        # Sample EXTRA_CHANNEL (51) different images randomly from the dataset
+        num_available = len(self.image_files)
         
-        # Read image
-        img, img_width = self.read_image_single(os.path.join(self.captcha_dir, filename))
-        label = self.label_padding(label_str, num_tokens)
+        if num_available >= EXTRA_CHANNEL:
+            # Sample without replacement if we have enough images
+            sampled_indices = np.random.choice(num_available, size=EXTRA_CHANNEL, replace=False)
+        else:
+            # Sample with replacement if we have fewer than EXTRA_CHANNEL images
+            sampled_indices = np.random.choice(num_available, size=EXTRA_CHANNEL, replace=True)
+        
+        # Load and process each sampled image
+        imgs = []
+        idxs = []
+        img_widths = []
+        labels = []
+        
+        for sampled_idx in sampled_indices:
+            filename = self.image_files[sampled_idx]
+            # Extract label from filename: remove extension and take part before '-'
+            # e.g., "0c3dp-0.png" -> "0c3dp", "002e23-0.png" -> "002e23"
+            name_without_ext = filename.replace('.png', '')
+            # Split by '-' and take the first part (the actual label)
+            label_str = name_without_ext.split('-')[0]
+            
+            # Read image
+            img, img_width = self.read_image_single(os.path.join(self.captcha_dir, filename))
+            label = self.label_padding(label_str, num_tokens)
+            
+            imgs.append(img)
+            idxs.append(filename.replace('.png', ''))
+            img_widths.append(img_width)
+            labels.append(label)
         
         # For captcha, we don't have writer IDs, so we use a dummy writer ID (0)
         # The model expects writer IDs, so we'll use 0 for all captcha images
         dummy_wid = 0
-        dummy_idx = filename.replace('.png', '')
-        
-        # Create a list structure similar to IAM_words format
-        # Since we need multiple images per batch, we'll repeat the same image
-        # The model expects EXTRA_CHANNEL images, so we'll create them
-        imgs = [img] * EXTRA_CHANNEL
-        idxs = [dummy_idx] * EXTRA_CHANNEL
-        img_widths = [img_width] * EXTRA_CHANNEL
-        labels = [label] * EXTRA_CHANNEL
         
         final_img = np.stack(imgs, axis=0)
         final_idx = np.array(idxs)
