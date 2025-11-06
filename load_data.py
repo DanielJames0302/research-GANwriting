@@ -297,7 +297,8 @@ class CaptchaDataset(D.Dataset):
             label_xt_swap = np.array(self.label_padding(label_xt_swap, num_tokens))
         else:
             label_xt = final_label[_id]
-            label_xt_swap = self.new_ed1(label_xt)
+            # Convert numpy array to list for new_ed1 (which uses .index() method)
+            label_xt_swap = self.new_ed1(label_xt.tolist())
         
         final_idx = np.delete(final_idx, _id, axis=0)
         final_img = np.delete(final_img, _id, axis=0)
